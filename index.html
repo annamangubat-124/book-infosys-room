@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shared Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0e17;
+    --surface: #1a1929;
+    --surface2: #232235;
+    --accent: #e8c547;
+    --accent2: #ff6b6b;
+    --text: #fffffe;
+    --muted: #a7a9be;
+    --border: rgba(255,255,255,0.08);
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+  }
+  header h1 span { color: var(--accent); }
+  .admin-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    padding: 7px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .admin-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── MAIN LAYOUT ── */
+  .app { display: flex; gap: 0; min-height: calc(100vh - 61px); }
+
+  /* ── CALENDAR PANEL ── */
+  .cal-panel {
+    flex: 1;
+    padding: 28px 32px;
+    min-width: 0;
+  }
+
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .cal-nav h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+  }
+  .nav-arrows { display: flex; gap: 8px; }
+  .nav-arrows button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-arrows button:hover { background: var(--accent); color: #000; }
+
+  .day-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .day-labels span {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 6px 0;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+  }
+
+  .cal-day {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 90px;
+    padding: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cal-day:hover { border-color: var(--accent); background: var(--surface2); }
+  .cal-day.other-month { opacity: 0.3; pointer-events: none; }
+  .cal-day.today { border-color: var(--accent); }
+  .cal-day.today .day-num { color: var(--accent); font-weight: 700; }
+  .cal-day.selected { background: var(--surface2); border-color: var(--accent2); }
+
+  .day-num {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .event-pill {
+    background: var(--accent);
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .event-pill.color-1 { background: #ff6b6b; color: #fff; }
+  .event-pill.color-2 { background: #4ecdc4; color: #000; }
+  .event-pill.color-3 { background: #a78bfa; color: #fff; }
+  .event-pill.color-4 { background: #f97316; color: #fff; }
+  .event-pill.color-0 { background: var(--accent); color: #000; }
+
+  .more-badge {
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 340px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sidebar h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+  }
+  .sidebar .selected-date-label {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 0.78rem; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .form-group input, .form-group textarea, .form-group select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    border-color: var(--accent);
+  }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+
+  .color-picker { display: flex; gap: 8px; align-items: center; }
+  .color-opt {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .color-opt:hover { transform: scale(1.15); }
+  .color-opt.active { border-color: #fff; transform: scale(1.15); }
+
+  .submit-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    width: 100%;
+  }
+  .submit-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+  .divider { border: none; border-top: 1px solid var(--border); }
+
+  /* ── EVENT LIST ── */
+  .event-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 260px; }
+  .event-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    position: relative;
+  }
+  .event-item .ev-title { font-weight: 600; font-size: 0.9rem; }
+  .event-item .ev-time { font-size: 0.75rem; color: var(--accent); margin-top: 2px; }
+  .event-item .ev-desc { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .event-item .ev-author { font-size: 0.72rem; color: var(--muted); margin-top: 4px; opacity: 0.7; }
+  .event-item .del-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.9rem; opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .event-item:hover .del-btn { opacity: 1; }
+  .event-item .del-btn:hover { color: var(--accent2); }
+  .ev-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle;
+  }
+  .no-events { font-size: 0.82rem; color: var(--muted); text-align: center; padding: 20px 0; }
+
+  /* ── MODAL OVERLAY ── */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 400px;
+    max-width: 94vw;
+    position: relative;
+  }
+  .modal h3 { font-family: 'Playfair Display', serif; font-size: 1.3rem; margin-bottom: 18px; }
+  .close-modal {
+    position: absolute; top: 16px; right: 20px;
+    background: none; border: none; color: var(--muted);
+    font-size: 1.3rem; cursor: pointer;
+  }
+  .close-modal:hover { color: var(--accent2); }
+
+  /* ── ADMIN PANEL ── */
+  .admin-panel { display: none; }
+  .admin-panel.show { display: block; }
+
+  .admin-controls {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .action-btn {
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    padding: 9px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.danger:hover { border-color: var(--accent2); color: var(--accent2); }
+  .action-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .action-btn.primary:hover { opacity: 0.88; }
+
+  .admin-events-list { display: flex; flex-direction: column; gap: 8px; max-height: 440px; overflow-y: auto; }
+  .admin-event-row {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px;
+  }
+  .admin-event-row .ev-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .admin-event-row button {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.75rem;
+    white-space: nowrap; flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .admin-event-row button:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--accent); color: #000;
+    padding: 12px 24px; border-radius: 999px;
+    font-weight: 600; font-size: 0.85rem;
+    z-index: 999; transition: transform 0.3s ease;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .filter-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-chip.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+
+  /* ── PRINT / PDF STYLES ── */
+  @media print {
+    header, .sidebar, .admin-btn, .nav-arrows, .filter-bar { display: none !important; }
+    .cal-panel { padding: 0; }
+    body { background: #fff !important; color: #000 !important; }
+    .cal-day { background: #f9f9f9 !important; border-color: #ddd !important; color: #000 !important; }
+    .day-num { color: #333 !important; }
+    .event-pill { font-size: 0.6rem !important; }
+  }
+
+  @media (max-width: 900px) {
+    .app { flex-direction: column; }
+    .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+    .cal-day { min-height: 64px; }
+  }
+  @media (max-width: 540px) {
+    .cal-panel { padding: 14px; }
+    header { padding: 14px 16px; }
+    .cal-day { min-height: 50px; padding: 4px; }
+    .event-pill { display: none; }
+    .day-num { font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- HEADER -->
+<header>
+  <h1>Shared <span>Calendar</span></h1>
+  <button class="admin-btn" onclick="openAdminLogin()">⚙ Admin</button>
+</header>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="overlay" id="adminLoginOverlay">
+  <div class="modal">
+    <button class="close-modal" onclick="closeOverlay('adminLoginOverlay')">✕</button>
+    <h3>Admin Access</h3>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Password</label>
+      <input type="password" id="adminPwInput" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') checkAdminPw()" />
+    </div>
+    <button class="submit-btn" onclick="checkAdminPw()">Unlock Admin Panel</button>
+    <p style="font-size:0.75rem;color:var(--muted);margin-top:12px;text-align:center;">Default password: <strong style="color:var(--accent)">admin123</strong> — change in code.</p>
+  </div>
+</div>
+
+<!-- ADMIN PANEL MODAL -->
+<div class="overlay" id="adminPanelOverlay">
+  <div class="modal" style="width:620px;max-width:96vw;">
+    <button class="close-modal" onclick="closeOverlay('adminPanelOverlay')">✕</button>
+    <h3>📋 Admin Panel</h3>
+    <div class="admin-controls">
+      <button class="action-btn primary" onclick="exportPDF()">⬇ Export PDF</button>
+      <button class="action-btn" onclick="exportJSON()">📁 Export JSON</button>
+      <button class="action-btn danger" onclick="clearAllEvents()">🗑 Clear All Events</button>
+    </div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;" id="adminEventCount"></div>
+    <div class="admin-events-list" id="adminEventsList"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app">
+
+  <!-- CALENDAR -->
+  <div class="cal-panel">
+    <div class="cal-nav">
+      <div class="nav-arrows">
+        <button onclick="changeMonth(-1)">‹</button>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+      <h2 id="monthTitle"></h2>
+      <button class="filter-chip active" id="todayBtn" onclick="goToToday()" style="font-size:0.8rem;padding:6px 16px;">Today</button>
+    </div>
+
+    <div class="day-labels">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div>
+      <div class="selected-date-label" id="selectedDateLabel">Select a date</div>
+      <h3 id="sidebarTitle">Add Event</h3>
+    </div>
+
+    <div class="form-group">
+      <label>Your Name</label>
+      <input type="text" id="evName" placeholder="e.g. Maria Santos" maxlength="60" />
+    </div>
+
+    <div class="form-group">
+      <label>Event Title *</label>
+      <input type="text" id="evTitle" placeholder="e.g. Team Meeting" maxlength="80" />
+    </div>
+
+    <div class="form-group">
+      <label>Time</label>
+      <input type="time" id="evTime" />
+    </div>
+
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="evDesc" placeholder="Optional details…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Color Tag</label>
+      <div class="color-picker">
+        <div class="color-opt active" style="background:#e8c547" data-color="0" onclick="setColor(0)"></div>
+        <div class="color-opt" style="background:#ff6b6b" data-color="1" onclick="setColor(1)"></div>
+        <div class="color-opt" style="background:#4ecdc4" data-color="2" onclick="setColor(2)"></div>
+        <div class="color-opt" style="background:#a78bfa" data-color="3" onclick="setColor(3)"></div>
+        <div class="color-opt" style="background:#f97316" data-color="4" onclick="setColor(4)"></div>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="addEvent()">+ Add Event</button>
+
+    <hr class="divider" />
+
+    <div>
+      <div style="font-size:0.78rem;color:var(--muted);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px;">Events on this day</div>
+      <div class="event-list" id="eventList">
+        <div class="no-events">Click a date to see events</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────
+const ADMIN_PASSWORD = "admin123"; // 🔑 Change this!
+const STORAGE_KEY = "shared_calendar_events_v2";
+const COLORS = ["#e8c547","#ff6b6b","#4ecdc4","#a78bfa","#f97316"];
+
+// ─── STATE ────────────────────────────────────────────────
+let currentDate = new Date();
+let selectedDate = null;
+let selectedColor = 0;
+let events = loadEvents();
+
+// ─── STORAGE ──────────────────────────────────────────────
+function loadEvents() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveEvents() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+}
+
+// ─── CALENDAR RENDER ──────────────────────────────────────
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function renderCalendar() {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  document.getElementById("monthTitle").textContent = `${MONTHS[month]} ${year}`;
+
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrev = new Date(year, month, 0).getDate();
+
+  const today = new Date();
+  const todayStr = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Fill leading blanks from prev month
+  for (let i = 0; i < firstDay; i++) {
+    const d = daysInPrev - firstDay + 1 + i;
+    const cell = makeCell(year, month - 1, d, true, todayStr);
+    grid.appendChild(cell);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = makeCell(year, month, d, false, todayStr);
+    grid.appendChild(cell);
+  }
+
+  // Fill trailing
+  const total = firstDay + daysInMonth;
+  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= trailing; d++) {
+    const cell = makeCell(year, month + 1, d, true, todayStr);
+    grid.appendChild(cell);
+  }
+}
+
+function makeCell(year, month, day, otherMonth, todayStr) {
+  const key = dateKey(year, month, day);
+  const cell = document.createElement("div");
+  cell.className = "cal-day" + (otherMonth ? " other-month" : "") + (key === todayStr ? " today" : "");
+  if (selectedDate === key) cell.classList.add("selected");
+
+  const num = document.createElement("div");
+  num.className = "day-num";
+  num.textContent = day;
+  cell.appendChild(num);
+
+  // Events for this day
+  const dayEvents = events.filter(e => e.date === key).sort((a,b)=>a.time.localeCompare(b.time));
+  const maxShow = 2;
+  dayEvents.slice(0, maxShow).forEach(ev => {
+    const pill = document.createElement("div");
+    pill.className = `event-pill color-${ev.color}`;
+    pill.textContent = (ev.time ? ev.time + " " : "") + ev.title;
+    pill.title = ev.title;
+    pill.onclick = (e) => { e.stopPropagation(); selectDate(key, year, month, day); };
+    cell.appendChild(pill);
+  });
+  if (dayEvents.length > maxShow) {
+    const more = document.createElement("div");
+    more.className = "more-badge";
+    more.textContent = `+${dayEvents.length - maxShow} more`;
+    cell.appendChild(more);
+  }
+
+  cell.onclick = () => selectDate(key, year, month, day);
+  return cell;
+}
+
+function dateKey(y, m, d) {
+  const date = new Date(y, m, d);
+  return date.getFullYear() + "-" +
+    String(date.getMonth()+1).padStart(2,"0") + "-" +
+    String(date.getDate()).padStart(2,"0");
+}
+
+function changeMonth(dir) {
+  currentDate.setMonth(currentDate.getMonth() + dir);
+  renderCalendar();
+}
+
+function goToToday() {
+  currentDate = new Date();
+  renderCalendar();
+}
+
+// ─── DATE SELECTION ───────────────────────────────────────
+function selectDate(key, year, month, day) {
+  selectedDate = key;
+  renderCalendar();
+
+  const formatted = new Date(year, month, day)
+    .toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  document.getElementById("selectedDateLabel").textContent = formatted;
+  document.getElementById("sidebarTitle").textContent = "Add Event";
+
+  // Pre-fill date hint
+  const timeInput = document.getElementById("evTime");
+  if (!timeInput.value) timeInput.value = "09:00";
+
+  renderEventList();
+}
+
+// ─── EVENT LIST (SIDEBAR) ─────────────────────────────────
+function renderEventList() {
+  const list = document.getElementById("eventList");
+  if (!selectedDate) { list.innerHTML = '<div class="no-events">Click a date to see events</div>'; return; }
+
+  const dayEvents = events.filter(e => e.date === selectedDate)
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  if (!dayEvents.length) {
+    list.innerHTML = '<div class="no-events">No events yet — add one!</div>';
+    return;
+  }
+
+  list.innerHTML = "";
+  dayEvents.forEach(ev => {
+    const item = document.createElement("div");
+    item.className = "event-item";
+    const dot = `<span class="ev-dot" style="background:${COLORS[ev.color]}"></span>`;
+    item.innerHTML = `
+      <div class="ev-title">${dot}${escHtml(ev.title)}</div>
+      ${ev.time ? `<div class="ev-time">🕐 ${ev.time}</div>` : ""}
+      ${ev.desc ? `<div class="ev-desc">${escHtml(ev.desc)}</div>` : ""}
+      ${ev.name ? `<div class="ev-author">Added by ${escHtml(ev.name)}</div>` : ""}
+      <button class="del-btn" onclick="deleteEvent('${ev.id}')" title="Remove">✕</button>
+    `;
+    list.appendChild(item);
+  });
+}
+
+// ─── ADD EVENT ────────────────────────────────────────────
+function addEvent() {
+  if (!selectedDate) { showToast("Please select a date first!"); return; }
+  const title = document.getElementById("evTitle").value.trim();
+  if (!title) { showToast("Event title is required."); return; }
+
+  const ev = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    date: selectedDate,
+    title,
+    time: document.getElementById("evTime").value || "",
+    desc: document.getElementById("evDesc").value.trim(),
+    name: document.getElementById("evName").value.trim(),
+    color: selectedColor,
+    createdAt: new Date().toISOString()
+  };
+
+  events.push(ev);
+  saveEvents();
+  renderCalendar();
+  renderEventList();
+
+  // Clear form
+  document.getElementById("evTitle").value = "";
+  document.getElementById("evDesc").value = "";
+  document.getElementById("evTime").value = "";
+
+  showToast("Event added! 🎉");
+}
+
+function deleteEvent(id) {
+  events = events.filter(e => e.id !== id);
+  saveEvents();
+  renderCalendar();
+  renderEventList();
+  showToast("Event removed.");
+}
+
+// ─── COLOR PICKER ─────────────────────────────────────────
+function setColor(c) {
+  selectedColor = c;
+  document.querySelectorAll(".color-opt").forEach(el => el.classList.remove("active"));
+  document.querySelector(`[data-color="${c}"]`).classList.add("active");
+}
+
+// ─── ADMIN ────────────────────────────────────────────────
+function openAdminLogin() {
+  document.getElementById("adminPwInput").value = "";
+  document.getElementById("adminLoginOverlay").classList.add("show");
+  setTimeout(() => document.getElementById("adminPwInput").focus(), 100);
+}
+
+function checkAdminPw() {
+  const val = document.getElementById("adminPwInput").value;
+  if (val === ADMIN_PASSWORD) {
+    closeOverlay("adminLoginOverlay");
+    openAdminPanel();
+  } else {
+    showToast("Wrong password.");
+    document.getElementById("adminPwInput").value = "";
+  }
+}
+
+function openAdminPanel() {
+  renderAdminPanel();
+  document.getElementById("adminPanelOverlay").classList.add("show");
+}
+
+function closeOverlay(id) {
+  document.getElementById(id).classList.remove("show");
+}
+
+function renderAdminPanel() {
+  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  document.getElementById("adminEventCount").textContent = `Total events: ${events.length}`;
+
+  const list = document.getElementById("adminEventsList");
+  if (!sorted.length) { list.innerHTML = '<div class="no-events">No events yet.</div>'; return; }
+
+  list.innerHTML = "";
+  sorted.forEach(ev => {
+    const row = document.createElement("div");
+    row.className = "admin-event-row";
+    const dot = `<span class="ev-dot" style="background:${COLORS[ev.color]};flex-shrink:0"></span>`;
+    row.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:0.88rem">${dot}${escHtml(ev.title)}</div>
+        <div class="ev-meta">${ev.date}${ev.time ? " · "+ev.time : ""}${ev.name ? " · by "+escHtml(ev.name) : ""}</div>
+        ${ev.desc ? `<div class="ev-meta" style="margin-top:2px">${escHtml(ev.desc)}</div>` : ""}
+      </div>
+      <button onclick="adminDeleteEvent('${ev.id}')">Delete</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function adminDeleteEvent(id) {
+  events = events.filter(e => e.id !== id);
+  saveEvents();
+  renderAdminPanel();
+  renderCalendar();
+  renderEventList();
+  showToast("Event deleted.");
+}
+
+function clearAllEvents() {
+  if (!confirm("Delete ALL events? This cannot be undone.")) return;
+  events = [];
+  saveEvents();
+  renderAdminPanel();
+  renderCalendar();
+  renderEventList();
+  showToast("All events cleared.");
+}
+
+// ─── EXPORT JSON ──────────────────────────────────────────
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(events, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `calendar-events-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showToast("JSON exported!");
+}
+
+// ─── EXPORT PDF (jsPDF) ───────────────────────────────────
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  const W = 210, margin = 18;
+  let y = margin;
+
+  // Title
+  doc.setFillColor(15, 14, 23);
+  doc.rect(0, 0, W, 30, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(232, 197, 71);
+  doc.text("Shared Calendar — Events Report", W / 2, 18, { align: "center" });
+  doc.setFontSize(9);
+  doc.setTextColor(167, 169, 190);
+  doc.text("Generated: " + new Date().toLocaleString(), W / 2, 25, { align: "center" });
+  y = 38;
+
+  // Group events by month
+  const sorted = [...events].sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  if (!sorted.length) {
+    doc.setFontSize(12); doc.setTextColor(80,80,80);
+    doc.text("No events found.", W/2, 80, { align:"center" });
+    doc.save("calendar-events.pdf"); return;
+  }
+
+  let lastMonth = "";
+
+  sorted.forEach(ev => {
+    const d = new Date(ev.date + "T00:00:00");
+    const monthLabel = d.toLocaleDateString("en-US", { month:"long", year:"numeric" });
+
+    if (monthLabel !== lastMonth) {
+      y += 4;
+      if (y > 265) { doc.addPage(); y = margin; }
+      doc.setFillColor(232, 197, 71);
+      doc.roundedRect(margin, y, W - margin*2, 8, 2, 2, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.text(monthLabel.toUpperCase(), margin + 4, y + 5.5);
+      y += 12;
+      lastMonth = monthLabel;
+    }
+
+    if (y > 265) { doc.addPage(); y = margin; }
+
+    // Event card background
+    doc.setFillColor(245, 245, 250);
+    doc.roundedRect(margin, y, W - margin*2, 20, 2, 2, "F");
+
+    // Color dot
+    const c = COLORS[ev.color] || COLORS[0];
+    const hex = c.replace("#","");
+    const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+    doc.setFillColor(r, g, b);
+    doc.circle(margin + 5, y + 10, 2.5, "F");
+
+    // Date & time
+    const dateStr = d.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(80, 80, 120);
+    doc.text(dateStr + (ev.time ? "  ·  " + ev.time : ""), margin + 10, y + 7);
+
+    // Title
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(20, 20, 40);
+    doc.text(ev.title.slice(0, 55), margin + 10, y + 14);
+
+    // Author / desc right side
+    if (ev.name) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(120, 120, 140);
+      doc.text("by " + ev.name, W - margin - 2, y + 7, { align: "right" });
+    }
+    if (ev.desc) {
+      doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.setTextColor(100, 100, 120);
+      const descLine = ev.desc.slice(0, 70) + (ev.desc.length > 70 ? "…" : "");
+      doc.text(descLine, margin + 10, y + 19);
+      y += 5;
+    }
+
+    y += 22;
+  });
+
+  // Footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(160,160,180);
+    doc.text(`Page ${i} of ${pageCount}`, W/2, 292, { align:"center" });
+  }
+
+  doc.save(`calendar-events-${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast("PDF downloaded! 📄");
+}
+
+// ─── HELPERS ──────────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+// Close overlays on backdrop click
+document.querySelectorAll(".overlay").forEach(el => {
+  el.addEventListener("click", e => { if (e.target === el) el.classList.remove("show"); });
+});
+
+// ─── INIT ─────────────────────────────────────────────────
+renderCalendar();
+</script>
+</body>
+</html>
