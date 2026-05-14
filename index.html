@@ -202,7 +202,7 @@
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
     border-color: var(--accent);
   }
-  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-group textarea { resize: vertical; min-height: 90px; }
 
   .color-picker { display: flex; gap: 8px; align-items: center; }
   .color-opt {
@@ -399,7 +399,7 @@
       <input type="password" id="adminPwInput" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') checkAdminPw()" />
     </div>
     <button class="submit-btn" onclick="checkAdminPw()">Unlock Admin Panel</button>
-  </div>
+</div>
 </div>
 
 <!-- ADMIN PANEL MODAL -->
@@ -451,7 +451,7 @@
 
     <div class="form-group">
       <label>Event Title *</label>
-      <input type="text" id="evTitle" placeholder="e.g. Team Meeting" maxlength="80" />
+      <input type="text" id="evTitle" placeholder="e.g. Proposal Defense" maxlength="80" />
     </div>
 
     <div class="form-group">
@@ -461,7 +461,7 @@
 
     <div class="form-group">
       <label>Description</label>
-      <textarea id="evDesc" placeholder="Input event details such as: Thesis Title, Student Names, Adviser's Name, and Panel Members....."></textarea>
+      <textarea id="evDesc" placeholder="Additional details such as; Thesis Title, Date and Time, Students' Names, Adviser's Name, and Panel Members...."></textarea>
     </div>
 
     <div class="form-group">
@@ -490,7 +490,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────
-const ADMIN_PASSWORD = "admin123"; // 🔑 Change this!
+const ADMIN_PASSWORD = "ccsitis2026"; // 🔑 Change this!
 const STORAGE_KEY = "shared_calendar_events_v2";
 const COLORS = ["#e8c547","#ff6b6b","#4ecdc4","#a78bfa","#f97316"];
 
@@ -498,6 +498,7 @@ const COLORS = ["#e8c547","#ff6b6b","#4ecdc4","#a78bfa","#f97316"];
 let currentDate = new Date();
 let selectedDate = null;
 let selectedColor = 0;
+let isAdmin = false;
 let events = loadEvents();
 
 // ─── STORAGE ──────────────────────────────────────────────
@@ -638,7 +639,7 @@ function renderEventList() {
       ${ev.time ? `<div class="ev-time">🕐 ${ev.time}</div>` : ""}
       ${ev.desc ? `<div class="ev-desc">${escHtml(ev.desc)}</div>` : ""}
       ${ev.name ? `<div class="ev-author">Added by ${escHtml(ev.name)}</div>` : ""}
-      <button class="del-btn" onclick="deleteEvent('${ev.id}')" title="Remove">✕</button>
+      ${isAdmin ? `<button class="del-btn" onclick="deleteEvent('${ev.id}')" title="Remove">✕</button>` : ""}
     `;
     list.appendChild(item);
   });
@@ -675,6 +676,10 @@ function addEvent() {
 }
 
 function deleteEvent(id) {
+  if (!isAdmin) {
+    showToast("Only admin can delete events.");
+    return;
+  }
   events = events.filter(e => e.id !== id);
   saveEvents();
   renderCalendar();
@@ -699,7 +704,9 @@ function openAdminLogin() {
 function checkAdminPw() {
   const val = document.getElementById("adminPwInput").value;
   if (val === ADMIN_PASSWORD) {
+    isAdmin = true;
     closeOverlay("adminLoginOverlay");
+    renderEventList();
     openAdminPanel();
   } else {
     showToast("Wrong password.");
